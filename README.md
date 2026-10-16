@@ -424,11 +424,11 @@ A：当前构建面向 Chrome / Edge（Chromium 内核，MV3）。Firefox 的 MV
 
 | 材料 | 位置 | 状态 |
 | --- | --- | --- |
-| 上传包 | `store/dist/video-sniffer-1.0.0.zip`（105 KB，18 个文件，SHA256 `43e08749…`） | ✅ 已通过强校验 |
+| 上传包 | `store/dist/video-sniffer-1.0.0.zip`（140 KB，21 个条目，SHA256 `8eba66c8…`） | ✅ 已通过强校验 |
 | 校验报告 | `store/dist/verify_report.md` | ✅ 失败 0 项（1 项已知警告：`<all_urls>` 需在权限理由中说明，文案已备好） |
 | 商店文案 + 隐私问卷答案 | `store/listing-zh-CN.md` / `store/listing-en.md` | ✅ 可直接复制粘贴 |
 | 商店图片 | `store/screenshots/`（5 张 1280×800 + 440×280 + 1400×560） | ✅ |
-| 隐私政策 | `privacy.html` / `store/privacy-policy.md` | ⚠️ 需你自行托管到公网 HTTPS 地址 |
+| 隐私政策 | `privacy.html` / `store/privacy-policy.md` | ✅ 已托管：<https://bebestself528-beep.github.io/video-sniffer-privacy/> |
 | 上架检查清单 | `store/checklist.md` | ✅ 含审核风险与对策 |
 
 三步走完：
