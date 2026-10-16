@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="head">
+    <div class="head-left">
+      <span class="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="2" y="2" width="20" height="20" rx="5" fill="#6366f1"/><path d="M12 6v8m0 0l-3.2-3.2M12 14l3.2-3.2" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 18h10" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      </span>
+      <span class="title">视频嗅探下载器</span>
+    </div>
+    <div class="head-right">
+      <button id="btnRescan" class="icon-btn" title="重新扫描页面">⟳</button>
+      <button id="btnClear" class="icon-btn" title="清空当前列表">🗑</button>
+      <button id="btnSettings" class="icon-btn" title="设置">⚙</button>
+    </div>
+  </header>
+
+  <!-- 设置面板 -->
+  <section id="settingsPanel" class="settings" hidden>
+    <div class="set-row">
+      <label>保存目录</label>
+      <input id="setFolder" type="text" placeholder="如：视频下载（留空为默认下载目录）">
+    </div>
+    <div class="set-row">
+      <label>输出格式</label>
+      <select id="setFormat">
+        <option value="auto">自动转 MP4（推荐）</option>
+        <option value="ts">仅合并为 TS（速度快）</option>
+      </select>
+    </div>
+    <div class="set-row">
+      <label>分片并发数</label>
+      <select id="setConcurrency">
+        <option value="4">4（保守）</option>
+        <option value="6">6（默认）</option>
+        <option value="8">8（较快）</option>
+        <option value="12">12（激进）</option>
+      </select>
+    </div>
+    <div class="set-hint">修改后自动保存。「自动转 MP4」在浏览器内完成转封装，失败会自动回退为 TS。保存目录对直接下载的文件生效；HLS 合并输出的文件因浏览器限制保存在默认下载目录根下。</div>
+  </section>
+
+  <!-- 任务进度区 -->
+  <section id="tasksSection" class="tasks" hidden>
+    <div class="section-title">下载任务</div>
+    <div id="taskList"></div>
+  </section>
+
+  <!-- 筛选 -->
+  <section class="chips" id="chips">
+    <button class="chip active" data-filter="all">全部 <i id="cAll">0</i></button>
+    <button class="chip" data-filter="hls">HLS <i id="cHls">0</i></button>
+    <button class="chip" data-filter="file">视频文件 <i id="cFile">0</i></button>
+    <button class="chip" data-filter="seg">分片 <i id="cSeg">0</i></button>
+    <button class="chip" data-filter="dom">页面元素 <i id="cDom">0</i></button>
+  </section>
+
+  <!-- 资源列表 -->
+  <main id="list" class="list"></main>
+
+  <footer class="foot">
+    <span id="footHint">正在扫描…</span>
+    <span class="foot-warn">不支持 DRM(Widevine) 加密内容 · <a href="#" id="usagePolicy">请仅下载您有权保存的视频</a></span>
+  </footer>
+
+  <script src="../lib/mediarole.js"></script>
+  <script src="../lib/hls.js"></script>
+  <script src="../lib/mpd.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

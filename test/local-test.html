@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>视频嗅探下载器 · 离线验证页</title>
+  <style>
+    body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; max-width: 900px; margin: 28px auto; padding: 0 20px; background: #f8fafc; color: #1e293b; }
+    h1 { font-size: 21px; margin-bottom: 6px; }
+    .lead { color: #64748b; font-size: 13.5px; line-height: 1.9; margin-bottom: 8px; }
+    h2 { font-size: 15px; margin-top: 26px; color: #334155; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-top: 10px; }
+    video { width: 100%; max-height: 300px; background: #000; border-radius: 8px; display: block; }
+    .tip { font-size: 13px; color: #64748b; line-height: 1.9; margin-top: 10px; }
+    code { background: #eef2ff; color: #4338ca; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+    .ok { color: #059669; font-weight: 600; }
+    .bad { color: #dc2626; font-weight: 600; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 13px; }
+    th, td { border: 1px solid #e2e8f0; padding: 7px 10px; text-align: left; }
+    th { background: #f1f5f9; }
+    #log { font-family: Consolas, monospace; font-size: 12px; background: #0f172a; color: #a5f3fc; border-radius: 8px; padding: 12px; margin-top: 10px; max-height: 190px; overflow: auto; white-space: pre-wrap; }
+    ol { font-size: 13.5px; line-height: 2; color: #334155; padding-left: 22px; }
+    .big { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h1>视频嗅探下载器 · 离线验证页</h1>
+  <p class="lead">
+    本页所有素材（m3u8 播放列表 / TS 分片 / MP4 文件）都由你本机的 <code>serve_local.mjs</code> 提供，
+    <strong>不依赖外网</strong>，因此验证结果稳定可复现。
+  </p>
+
+  <h2>验证步骤</h2>
+  <ol>
+    <li>确认扩展已安装并在工具栏中（紫色下载图标，可在扩展菜单里「固定」）。</li>
+    <li>让下面「测试 1」的按钮跑一次（点一下即可制造网络请求）。</li>
+    <li>点击工具栏的扩展图标 → 列表中应出现 <code>stream.m3u8</code>（HLS）、<code>seg0/1/2.ts</code>（分片）、<code>flower.mp4</code>（视频文件）。</li>
+    <li>对 <code>stream.m3u8</code> 点「选择清晰度」→ 面板显示「直接下载 · 共 3 个分片」→ 点击。</li>
+    <li>上方「下载任务」区观察进度，完成后去<strong>浏览器下载目录</strong>查看文件。</li>
+    <li>最后点「测试 4」的按钮，验证 <strong>DASH 音视频分离 → 自动合并</strong>（即 B站 那个问题的修复）。</li>
+  </ol>
+
+  <h2>测试 1：制造 HLS 网络请求（点一下按钮）</h2>
+  <div class="card">
+    <button id="btnHls" class="big" style="padding:9px 20px;border-radius:9px;border:1px solid #6366f1;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;">请求 m3u8 + 3 个 TS 分片</button>
+    <p class="tip">点击后扩展应嗅探到 1 条 <code>HLS</code> 与 3 条 <code>TS</code>（分片分类里）。这是最核心的验证点。</p>
+    <div id="log">（等待操作…）</div>
+  </div>
+
+  <h2>测试 2：页面内的 MP4 元素（DOM 扫描通道）</h2>
+  <div class="card">
+    <video id="v2" controls muted playsinline preload="metadata" src="/flower.mp4"></video>
+    <p class="tip">本地 MP4。同一地址会被「网络请求」与「页面元素」两个通道分别发现，扩展按地址去重合并为一条 <code>MP4</code> 记录，因此来源通常显示为「网络请求」。点「下载」可直接保存。</p>
+  </div>
+
+  <h2>测试 3：<code>&lt;source&gt;</code> 内联资源</h2>
+  <div class="card">
+    <video controls muted playsinline>
+      <source src="/flower.mp4" type="video/mp4">
+    </video>
+    <p class="tip">静态 source 标签，应由内容脚本识别（来源显示为「页面元素」）。</p>
+  </div>
+
+  <h2>测试 4：DASH 音视频分离 → 自动合并（重点！）</h2>
+  <div class="card">
+    <button id="btnDash" class="big" style="padding:9px 20px;border-radius:9px;border:1px solid #6366f1;background:#6366f1;color:#fff;font-size:14px;cursor:pointer;">请求 mpd + 两条独立轨（视频轨 / 音频轨）</button>
+    <p class="tip">
+      这两条 <code>.m4s</code> 是从 B站 真实抓取的样本：<strong>视频轨只有画面、音频轨只有声音</strong>（B站 等 DASH 站点就是这样拆开传输的）。
+      请求完成后打开扩展：
+    </p>
+    <ul class="tip" style="margin-top:2px">
+      <li><code>movie-1-30080.m4s</code> 应显示为 <strong>M4S·视频</strong>，副标题含 <code>avc1</code> 与分辨率，按钮为 <strong>「下载（含声音）」</strong>，下方提示"两条独立流，会自动合并"；</li>
+      <li><code>movie-1-30280.m4s</code> 应显示为 <strong>M4S·音频</strong>（<code>mp4a</code>、声道/采样率），并提示"已被自动合并，一般无需单独下载"。</li>
+    </ul>
+    <p class="tip">
+      <strong>验证的关键一步：</strong>点视频轨那条的「下载（含声音）」，完成后到下载目录查看——
+      <span class="ok">只应产生 1 个 .mp4 文件</span>，并且<strong>既有画面也有声音</strong>（样本只含开头约 5 秒，时长显示为 45 秒属正常，因为文件头声明了完整时长）。
+      如果出现「一个有画面没声音 + 一个有声音没画面」两个文件，说明合并链路有问题。
+    </p>
+    <div id="log2" style="font-family:Consolas,monospace;font-size:12px;background:#0f172a;color:#a5f3fc;border-radius:8px;padding:12px;margin-top:10px;max-height:150px;overflow:auto;white-space:pre-wrap;">（等待操作…）</div>
+  </div>
+
+  <h2>测试 5：DASH 分片形态（清单里列着 init 段 + N 个分片）</h2>
+  <div class="card">
+    <button id="btnDash2" class="big" style="padding:9px 20px;border-radius:9px;border:1px solid #0ea5e9;background:#0ea5e9;color:#fff;font-size:14px;cursor:pointer;">请求分片形态的 mpd + 全部 init/分片</button>
+    <p class="tip">
+      真实 DASH 站点不是「一条轨一个文件」，而是 <strong>init 段 + N 个分片</strong>，清单里列着要下哪些地址。
+      这一份清单是把上面同样的 B站 轨道按 <code>moof</code> 边界切出来的（拼接回来与原文件逐字节一致）：
+      画面 <strong>7 个分片</strong>、声音 <strong>8 个分片</strong>。
+    </p>
+    <ul class="tip" style="margin-top:2px">
+      <li><code>stream.mpd</code> 应显示为 <strong>DASH</strong>，下方提示"清单里有 1 条画面轨 + 1 条音频轨"，按钮为 <strong>「选择清晰度」</strong>；</li>
+      <li>点「选择清晰度」→ 面板列出画面档位（分辨率 / 编码 / 码率 / <strong>分片数</strong>）与「声音是独立音频轨，下载时会自动合并」的提示；</li>
+      <li>点该档位开始下载 → 任务说明应写「<strong>已合并视频轨 + 音频轨</strong>」，并注明分片数。</li>
+    </ul>
+    <p class="tip">
+      <strong>验证的关键一步：</strong>完成后到下载目录查看——<span class="ok">只应产生 1 个 .mp4</span>，
+      且既有画面也有声音。这条路径专门验证「清单 → 分片下载 → 拼接 → 合并」不会把分片漏下或错序。
+    </p>
+    <div id="log3" style="font-family:Consolas,monospace;font-size:12px;background:#0f172a;color:#a5f3fc;border-radius:8px;padding:12px;margin-top:10px;max-height:150px;overflow:auto;white-space:pre-wrap;">（等待操作…）</div>
+  </div>
+
+  <h2>预期结果对照表</h2>
+  <table>
+    <tr><th>列表条目</th><th>类型标签</th><th>可执行操作</th><th>预期下载结果</th></tr>
+    <tr><td>stream.m3u8</td><td>HLS</td><td>选择清晰度 → 直接下载</td><td>合并 3 个分片 → 转封装 → <code>.mp4</code>（约 800KB+，可正常播放）</td></tr>
+    <tr><td>seg0/1/2.ts</td><td>TS</td><td>—（分片不建议单独下载）</td><td>—</td></tr>
+    <tr><td>flower.mp4</td><td>MP4</td><td>下载</td><td>直接保存 <code>.mp4</code>（约 1.1MB）</td></tr>
+    <tr><td>stream.mpd</td><td>DASH</td><td><strong>选择清晰度</strong></td><td>列出清单里的画面档位，下载时自动合并音频轨 → <strong>1 个 .mp4</strong></td></tr>
+    <tr><td>movie-1-30080.m4s</td><td>M4S·视频</td><td><strong>下载（含声音）</strong> / 仅视频</td><td><strong>1 个 .mp4，含画面 + 声音</strong>（自动合并音频轨）</td></tr>
+    <tr><td>movie-1-30280.m4s</td><td>M4S·音频</td><td>单独下载</td><td>仅声音；已被上面那条自动合并，一般不需要</td></tr>
+    <tr><td>/dash2/stream.mpd</td><td>DASH</td><td><strong>选择清晰度</strong></td><td>画面 7 个分片 + 声音 8 个分片各自拼接后合并 → <strong>1 个 .mp4</strong></td></tr>
+    <tr><td>dash2 的音频轨</td><td>音频轨</td><td>单独下载</td><td>拼接成一条完整音频 → <code>.m4a</code></td></tr>
+  </table>
+
+  <script>
+    var logEl = document.getElementById('log');
+    function log(s) { logEl.textContent += '\n' + s; }
+    logEl.textContent = '（等待操作…）';
+
+    var logEl2 = document.getElementById('log2');
+    function log2(s) { logEl2.textContent += '\n' + s; }
+    logEl2.textContent = '（等待操作…）';
+
+    var logEl3 = document.getElementById('log3');
+    function log3(s) { logEl3.textContent += '\n' + s; }
+    logEl3.textContent = '（等待操作…）';
+
+    document.getElementById('btnDash2').addEventListener('click', async function () {
+      logEl3.textContent = '开始请求…';
+      try {
+        var mpd = await (await fetch('/dash2/stream.mpd')).text();
+        var segs = mpd.match(/SegmentURL[^>]*media="([^"]+)"/g) || [];
+        log3('✓ stream.mpd 已请求（' + segs.length + ' 个分片地址）');
+        var names = ['video/init.mp4', 'audio/init.mp4'];
+        for (var i = 1; i <= 7; i++) names.push('video/' + String(i).padStart(5, '0') + '.m4s');
+        for (var j = 1; j <= 8; j++) names.push('audio/' + String(j).padStart(5, '0') + '.m4s');
+        var total = 0;
+        for (var k = 0; k < names.length; k++) {
+          var r = await fetch('/dash2/' + names[k]);
+          var b = await r.arrayBuffer();
+          total += b.byteLength;
+        }
+        log3('✓ init 段与 ' + (names.length - 2) + ' 个分片已请求  共 ' + (total / 1024).toFixed(0) + ' KB');
+        log3('\n完成。现在点击扩展图标：应看到「DASH」与「音频轨」两条；点 DASH 那条的「选择清晰度」下载含声音的完整视频。');
+      } catch (e) {
+        log3('✗ 请求失败：' + e.message);
+      }
+    });
+
+    document.getElementById('btnDash').addEventListener('click', async function () {
+      logEl2.textContent = '开始请求…';
+      try {
+        var mpd = await (await fetch('/dash/stream.mpd')).text();
+        log2('✓ stream.mpd 已请求（' + (mpd.match(/Representation/g) || []).length + ' 条 Representation）');
+        var rv = await fetch('/dash/movie-1-30080.m4s');
+        var bv = await rv.arrayBuffer();
+        log2('✓ movie-1-30080.m4s（视频轨）已请求  ' + (bv.byteLength / 1024).toFixed(0) + ' KB');
+        var ra = await fetch('/dash/movie-1-30280.m4s');
+        var ba = await ra.arrayBuffer();
+        log2('✓ movie-1-30280.m4s（音频轨）已请求  ' + (ba.byteLength / 1024).toFixed(0) + ' KB');
+        log2('\n完成。现在点击扩展图标：应看到「M4S·视频」与「M4S·音频」两条，视频轨按钮为「下载（含声音）」。');
+      } catch (e) {
+        log2('✗ 请求失败：' + e.message);
+      }
+    });
+
+    document.getElementById('btnHls').addEventListener('click', async function () {      logEl.textContent = '开始请求…';
+      try {
+        var base = location.origin;
+        var t = await (await fetch('/stream.m3u8')).text();
+        log('✓ m3u8 已请求，' + t.split('\n').filter(function (l) { return l && l[0] !== '#'; }).length + ' 个分片地址');
+
+        var sizes = [];
+        for (var i = 0; i < 3; i++) {
+          var r = await fetch('/seg' + i + '.ts');
+          var b = await r.arrayBuffer();
+          sizes.push((b.byteLength / 1024).toFixed(0) + 'KB');
+          log('✓ seg' + i + '.ts 已请求  ' + (b.byteLength / 1024).toFixed(0) + ' KB');
+        }
+        log('\n全部请求完成（' + sizes.join(' / ') + '）。现在点击扩展图标查看列表。');
+      } catch (e) {
+        log('✗ 请求失败：' + e.message);
+      }
+    });
+  </script>
+</body>
+</html>

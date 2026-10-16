@@ -1,0 +1,82 @@
+/* 商店截图生成器样式（开发工具） */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 100vw; height: 100vh; overflow: hidden; }
+body {
+  font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  background: linear-gradient(135deg, #f7f8ff 0%, #eef0fb 55%, #e9ecfa 100%);
+  position: relative;
+}
+
+.bg-blob { position: absolute; border-radius: 50%; filter: blur(0px); opacity: .55; }
+.b1 { width: 560px; height: 560px; left: -160px; top: -200px; background: radial-gradient(circle at 40% 40%, #dfe3ff 0%, rgba(223,227,255,0) 70%); }
+.b2 { width: 640px; height: 640px; right: -180px; bottom: -260px; background: radial-gradient(circle at 50% 50%, #e6e0ff 0%, rgba(230,224,255,0) 70%); }
+.bg-dots {
+  position: absolute; inset: 0;
+  background-image: radial-gradient(#c9cdf0 1.1px, transparent 1.1px);
+  background-size: 26px 26px;
+  opacity: .35;
+  mask-image: linear-gradient(115deg, rgba(0,0,0,.9), rgba(0,0,0,0) 62%);
+  -webkit-mask-image: linear-gradient(115deg, rgba(0,0,0,.9), rgba(0,0,0,0) 62%);
+}
+
+.left { position: absolute; left: 92px; top: 118px; width: 520px; }
+.brand { display: flex; align-items: center; gap: 14px; margin-bottom: 34px; }
+.brand img { width: 52px; height: 52px; border-radius: 13px; }
+.brand span { font-size: 21px; font-weight: 600; color: #3b3f63; letter-spacing: .5px; }
+
+h1 { font-size: 44px; line-height: 1.28; color: #23264a; font-weight: 700; letter-spacing: 1px; white-space: pre-line; }
+
+ul { list-style: none; margin-top: 40px; }
+li {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 17px; color: #4a4f78; margin-bottom: 18px;
+}
+li::before {
+  content: ""; flex: none; width: 22px; height: 22px; border-radius: 50%;
+  background: #6366f1 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.2l2.3 2.3 4.7-5' stroke='white' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat;
+}
+
+.badge-row { margin-top: 44px; display: flex; gap: 10px; flex-wrap: wrap; }
+.badge-row i {
+  font-style: normal; font-size: 13px; color: #5b5fa8;
+  background: rgba(99, 102, 241, .12);
+  border: 1px solid rgba(99, 102, 241, .28);
+  padding: 6px 14px; border-radius: 999px;
+}
+
+.right { position: absolute; right: 92px; top: 78px; }
+.device {
+  width: 444px; padding: 12px; border-radius: 22px;
+  background: rgba(255, 255, 255, .82);
+  border: 1px solid rgba(120, 124, 200, .25);
+  box-shadow: 0 30px 70px rgba(64, 68, 140, .22), 0 6px 18px rgba(64, 68, 140, .12);
+}
+.device iframe { display: block; width: 420px; height: 630px; border: none; border-radius: 12px; background: #fff; }
+
+/* 演示数据说明 */
+.disclaimer {
+  position: fixed; left: 92px; bottom: 28px;
+  font-size: 12px; color: #9296bb; letter-spacing: .3px;
+}
+
+/* 小图（440x280）专用 */body.tile { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); }
+body.tile .bg-blob, body.tile .bg-dots { display: none; }
+body.tile .left { left: 34px; top: 46px; width: 372px; }
+body.tile .right { display: none; }
+body.tile .brand { margin-bottom: 0; }
+body.tile .brand img { width: 46px; height: 46px; border-radius: 12px; }
+body.tile .brand span { color: #fff; font-size: 22px; font-weight: 700; }
+body.tile h1 { color: #fff; font-size: 25px; margin-top: 26px; letter-spacing: .5px; }
+body.tile ul { display: none; }
+body.tile .badge-row { margin-top: 22px; }
+body.tile .badge-row i { color: #fff; background: rgba(255,255,255,.16); border-color: rgba(255,255,255,.4); font-size: 12px; padding: 5px 11px; }
+
+/* 大图（1400x560）专用：把 popup 预览等比缩小以完整放入 */
+body.marquee .left { left: 84px; top: 92px; width: 620px; }
+body.marquee h1 { font-size: 40px; }
+body.marquee ul { margin-top: 30px; }
+body.marquee li { font-size: 16px; margin-bottom: 15px; }
+body.marquee .badge-row { margin-top: 34px; }
+body.marquee .right { right: 66px; top: 30px; transform: scale(.77); transform-origin: top right; }
+body.marquee .disclaimer { left: 84px; bottom: 20px; }
+

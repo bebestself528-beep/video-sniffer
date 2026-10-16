@@ -1,0 +1,97 @@
+{
+  "generatedAt": "2026-10-15T17:01:39.284Z",
+  "note": "界面演示数据，示例域名为虚构域名；小宣传图 440x280，应用截图 1280x800",
+  "shots": [
+    {
+      "id": "01-overview",
+      "file": "01-overview-1280x800.png",
+      "dim": {
+        "w": 1280,
+        "h": 800
+      },
+      "expect": {
+        "w": 1280,
+        "h": 800
+      },
+      "ok": true
+    },
+    {
+      "id": "02-quality",
+      "file": "02-quality-1280x800.png",
+      "dim": {
+        "w": 1280,
+        "h": 800
+      },
+      "expect": {
+        "w": 1280,
+        "h": 800
+      },
+      "ok": true
+    },
+    {
+      "id": "03-tasks",
+      "file": "03-tasks-1280x800.png",
+      "dim": {
+        "w": 1280,
+        "h": 800
+      },
+      "expect": {
+        "w": 1280,
+        "h": 800
+      },
+      "ok": true
+    },
+    {
+      "id": "04-safe",
+      "file": "04-safe-1280x800.png",
+      "dim": {
+        "w": 1280,
+        "h": 800
+      },
+      "expect": {
+        "w": 1280,
+        "h": 800
+      },
+      "ok": true
+    },
+    {
+      "id": "05-coverage",
+      "file": "05-coverage-1280x800.png",
+      "dim": {
+        "w": 1280,
+        "h": 800
+      },
+      "expect": {
+        "w": 1280,
+        "h": 800
+      },
+      "ok": true
+    },
+    {
+      "id": "marquee",
+      "file": "marquee-1400x560.png",
+      "dim": {
+        "w": 1400,
+        "h": 560
+      },
+      "expect": {
+        "w": 1400,
+        "h": 560
+      },
+      "ok": true
+    },
+    {
+      "id": "tile",
+      "file": "tile-440x280.png",
+      "dim": {
+        "w": 440,
+        "h": 280
+      },
+      "expect": {
+        "w": 440,
+        "h": 280
+      },
+      "ok": true
+    }
+  ]
+}

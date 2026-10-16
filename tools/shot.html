@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>商店截图生成器（开发工具，不随商店包分发）</title>
+  <link rel="stylesheet" href="shot.css">
+</head>
+<body>
+  <div class="bg-blob b1"></div>
+  <div class="bg-blob b2"></div>
+  <div class="bg-dots"></div>
+
+  <div class="left">
+    <div class="brand">
+      <img src="../icons/icon128.png" alt="">
+      <span>视频嗅探下载器</span>
+    </div>
+    <h1 id="h1"></h1>
+    <ul id="feats"></ul>
+    <div class="badge-row" id="badges"></div>
+  </div>
+
+  <div class="right">
+    <div class="device">
+      <iframe id="pop" src="../popup/popup.html" scrolling="no"></iframe>
+    </div>
+  </div>
+
+  <script src="shot.js"></script>
+</body>
+</html>

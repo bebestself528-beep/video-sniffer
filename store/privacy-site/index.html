@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>隐私政策 - 视频嗅探下载器</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font: 14px/1.85 -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif; color: #1f2333; background: #f6f7fb; padding: 44px 20px 72px; }
+    main { max-width: 760px; margin: 0 auto; background: #fff; border: 1px solid #e5e7f0; border-radius: 14px; padding: 38px 42px 46px; }
+    h1 { font-size: 22px; margin-bottom: 6px; }
+    .sub { color: #6b7280; font-size: 12.5px; margin-bottom: 26px; }
+    h2 { font-size: 15px; margin: 26px 0 8px; color: #23264a; }
+    p, li { color: #374151; }
+    ul, ol { padding-left: 22px; }
+    li { margin: 5px 0; }
+    code { background: #f1f2f7; padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+    th, td { border: 1px solid #e5e7f0; padding: 8px 10px; text-align: left; vertical-align: top; }
+    th { background: #f8f9fd; font-weight: 600; }
+    .callout { background: #eef2ff; border: 1px solid #c7d2fe; color: #3730a3; border-radius: 10px; padding: 12px 16px; margin: 18px 0; font-size: 13.5px; }
+    a { color: #4f46e5; }
+    footer { max-width: 760px; margin: 18px auto 0; color: #9ca3af; font-size: 12px; text-align: center; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #16171d; color: #eceef5; }
+      main { background: #1c1d24; border-color: #33364a; }
+      h1, h2 { color: #f3f4f8; }
+      p, li { color: #cbd0dc; }
+      .sub { color: #9aa0b0; }
+      code { background: #24262f; }
+      th, td { border-color: #33364a; }
+      th { background: #24262f; }
+      .callout { background: #20233a; border-color: #3b3f6b; color: #c7d2fe; }
+      a { color: #a5b4fc; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>隐私政策</h1>
+    <div class="sub">视频嗅探下载器（Video Sniffer Downloader）· 最后更新：随扩展版本同步更新</div>
+
+    <div class="callout">
+      <strong>一句话概括：</strong>本扩展没有服务器、没有账号体系，<strong>不收集、不上传、不出售</strong>你的任何数据。所有识别、下载、解密与转封装都在你的电脑上本地完成。
+    </div>
+
+    <h2>1. 我们处理哪些数据，为什么</h2>
+    <p>扩展在运行过程中会<strong>在本机内存中</strong>临时读取以下信息，用途仅限于「找出当前页面正在播放的视频资源并把它保存到你的磁盘」：</p>
+    <table>
+      <tr><th>信息</th><th>用途</th><th>是否离开你的设备</th></tr>
+      <tr><td>页面发起的网络请求地址（含媒体文件 URL、请求头中的 Referer/Origin）</td><td>识别视频流地址（m3u8 / mpd / m4s / ts / mp4 等），并在下载时补齐源站所需的来源信息</td><td><strong>否</strong></td></tr>
+      <tr><td>页面中 <code>&lt;video&gt;</code> 元素的地址与尺寸信息</td><td>识别嵌入播放器的视频资源</td><td><strong>否</strong></td></tr>
+      <tr><td>当前标签页的标题与网址</td><td>把嗅探结果归属到正确的标签页，并据此生成默认文件名</td><td><strong>否</strong></td></tr>
+      <tr><td>你保存的设置（保存目录、输出格式、并发数）</td><td>记住你的偏好，下次打开时沿用</td><td><strong>否</strong>（保存在浏览器本地存储中）</td></tr>
+    </table>
+    <p>上述信息均<strong>不会</strong>发送到开发者或任何第三方。扩展不含统计 SDK、不含广告 SDK、不含崩溃上报、不含远程配置。</p>
+
+    <h2>2. 我们明确不收集的数据</h2>
+    <ul>
+      <li>不收集浏览历史记录、搜索记录或你访问过的网页清单。</li>
+      <li>不收集任何视频内容本身。</li>
+      <li>不收集姓名、邮箱、电话、地址等个人身份信息。</li>
+      <li>不收集登录凭据、Cookie、令牌等认证信息。</li>
+      <li>不收集财务信息、健康信息、位置信息、个人通信内容。</li>
+    </ul>
+
+    <h2>3. 数据会被共享吗</h2>
+    <p>不会。开发者无法访问你的任何数据。扩展不向任何第三方传输数据，也不存在「出售数据」的情形。</p>
+    <p>唯一的网络行为是：当你点击「下载」时，扩展<strong>直接向视频所在的服务器</strong>请求该视频文件本身——这与你用浏览器播放视频时的请求性质相同，请求对象是内容提供方，与开发者无关。</p>
+
+    <h2>4. 权限说明</h2>
+    <ul>
+      <li><code>webRequest</code>：以<strong>只读观测</strong>方式查看页面发起的网络请求，用于识别视频地址。不修改、不阻断、不伪造任何请求。</li>
+      <li><code>downloads</code>：把你点击下载的资源保存到本机下载目录。</li>
+      <li><code>declarativeNetRequest</code>：为已识别的视频请求设置来源（Referer）请求头，使部分校验来源的站点资源能正常下载。仅使用会话级规则，不会设置全局拦截或改写规则。</li>
+      <li><code>storage</code>：在本机保存上述少量设置与当前标签页的嗅探结果。</li>
+      <li><code>tabs</code>：获取当前标签页的标题与 ID，用于归类嗅探结果与生成文件名。</li>
+      <li><code>offscreen</code>：Manifest V3 的后台服务工作线程没有 DOM 与 Blob 能力，需借助离屏文档完成分片合并、解密与文件写出。</li>
+      <li>网站访问权限（所有网站）：视频资源可能来自任意域名，扩展需在任意页面监听媒体请求，并在下载时访问对应资源域名。该权限<strong>仅用于视频资源识别与下载</strong>，不会读取、分析或上传页面内容。</li>
+    </ul>
+
+    <h2>5. 数据保留与删除</h2>
+    <p>嗅探结果保存在浏览器的会话存储中，随标签页关闭或浏览器退出而清除，你也可以随时点击界面上的「清空」按钮立即删除。设置项保存在浏览器本地存储中，卸载扩展即被删除。</p>
+
+    <h2>6. 远程代码</h2>
+    <p>本扩展<strong>不使用任何远程代码</strong>。所有可执行 JavaScript 均包含在扩展安装包内（包含本地打包的开源库 mux.js，用于 MP4 转封装）。扩展不会从网络下载并执行脚本，也不使用 <code>eval()</code>。</p>
+
+    <h2>7. 儿童隐私</h2>
+    <p>本扩展不面向儿童，也不会有意收集儿童的个人信息。</p>
+
+    <h2>8. 政策变更</h2>
+    <p>若本政策发生变更，新版本将随扩展更新一同发布，并同步更新本页面的「最后更新」时间。</p>
+
+    <h2>9. 联系方式</h2>
+    <p>如对本隐私政策有疑问，请通过 Chrome 应用商店详情页中提供的支持邮箱与我们联系。</p>
+  </main>
+  <footer>视频嗅探下载器 · 本地运行，不上传任何数据</footer>
+</body>
+</html>

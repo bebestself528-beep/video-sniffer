@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>视频嗅探下载器 - 测试页面</title>
+  <style>
+    body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; max-width: 860px; margin: 30px auto; padding: 0 20px; background: #f8fafc; color: #1e293b; }
+    h1 { font-size: 20px; }
+    h2 { font-size: 15px; margin-top: 28px; color: #475569; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-top: 10px; }
+    video { width: 100%; max-height: 320px; background: #000; border-radius: 8px; }
+    .tip { font-size: 13px; color: #64748b; line-height: 1.8; }
+    code { background: #eef2ff; color: #4338ca; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <h1>视频嗅探下载器 · 测试页面</h1>
+  <p class="tip">
+    使用方法：加载扩展后打开本页面 → 点击插件图标 → 等待列表出现资源 → 点击「选择清晰度」或「下载」。<br>
+    若以 <code>file://</code> 打开本页，请在 <code>chrome://extensions</code> 中为本插件开启「允许访问文件网址」。
+  </p>
+
+  <h2>测试 1：HLS (m3u8) 流 — 应显示为 <code>HLS</code> 类型</h2>
+  <div class="card">
+    <video id="v1" controls playsinline></video>
+    <p class="tip">公开测试流（mux.dev 提供的 Big Buck Bunny HLS，TS 分片）。播放几秒后插件即可嗅探到 <code>.m3u8</code> 与 <code>.ts</code> 分片。</p>
+  </div>
+
+  <h2>测试 2：普通 MP4 文件 — 应显示为 <code>MP4</code> 类型</h2>
+  <div class="card">
+    <video id="v2" controls playsinline src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"></video>
+    <p class="tip">MDN 提供的 CC0 示例视频，可直接点击「下载」保存。</p>
+  </div>
+
+  <h2>测试 3：页面内 DOM 元素（静态 source）</h2>
+  <div class="card">
+    <video controls playsinline>
+      <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm" type="video/webm">
+    </video>
+    <p class="tip">video/source 内联资源，应被内容脚本识别（来源显示为「页面元素」）。</p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+  <script>
+    var v = document.getElementById('v1');
+    var url = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
+    if (window.Hls && Hls.isSupported()) {
+      var hls = new Hls();
+      hls.loadSource(url);
+      hls.attachMedia(v);
+    } else if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = url;
+    }
+  </script>
+</body>
+</html>
