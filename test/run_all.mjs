@@ -2,7 +2,7 @@
  * 全量回归总控脚本
  * 运行：node test/run_all.mjs
  *
- * 作用：把 17 个测试套件按「单测 → 端到端 → 界面 → 离线自检」顺序全部跑一遍，
+ * 作用：把 19 个测试套件按「单测 → 端到端 → 界面 → 离线自检」顺序全部跑一遍，
  *       并自动处理需要本地服务器的套件（自行启动/停止 serve_local.mjs）。
  *
  * 为什么需要它：套件多了以后手动逐个跑容易漏（尤其新增套件后忘记加进回归清单），
@@ -30,6 +30,7 @@ const SUITES = [
   { file: 'mediarole.test.mjs',         name: '媒体角色识别' },
   { file: 'mpd.test.mjs',               name: 'DASH 清单解析' },
   { file: 'fmp4merge.test.mjs',         name: 'fMP4 合并' },
+  { file: 'hls_cred.test.mjs',          name: 'HLS 凭证与编码识别' },
   { file: 'webmmerge.test.mjs',         name: 'WebM 合并' },
   { file: 'e2e_headless.mjs',           name: '端到端基础' },
   { file: 'e2e_merge.mjs',              name: '合并下载端到端' },
@@ -40,6 +41,7 @@ const SUITES = [
   { file: 'e2e_dash_parts.mjs',         name: 'DASH 分片端到端' },
   { file: 'e2e_youtube_style.mjs',      name: 'YouTube 形态端到端' },
   { file: 'e2e_hls_aes.mjs',            name: 'HLS AES-128 端到端' },
+  { file: 'e2e_cred_fallback.mjs',      name: 'HLS 凭证降级端到端' },
   { file: 'popup_tracks.test.mjs',      name: '界面轨道配对回归' },
   { file: 'verify_local_page.mjs',      name: '离线验证环境自检', needsServer: true },
 ];

@@ -142,12 +142,35 @@
     return n.toFixed(n >= 100 || i === 0 ? 0 : 1) + ' ' + units[i];
   }
 
+  /* 条目上的"距今多久"。
+     过去这里直接把嗅探时间戳格式化成 HH:MM:SS 摆在条目副标题里，且没有任何标签 ——
+     用户会把它当成视频时长（"一直显示 9:53:38"就是这么来的：那是请求发生时的钟点，
+     条目不刷新它就永远停在那儿）。改成相对时间，精确钟点只放进 title 提示。 */
   function fmtTime(ts) {
-    try {
-      const d = new Date(ts);
-      const p = (x) => String(x).padStart(2, '0');
-      return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
-    } catch (e) { return ''; }
+    if (!ts || !isFinite(ts)) return '';
+    const diff = Date.now() - ts;
+    if (diff < 0) return '刚刚';
+    const s = Math.floor(diff / 1000);
+    if (s < 45) return '刚刚';
+    const m = Math.floor(s / 60);
+    if (m < 60) return m + ' 分钟前';
+    const h = Math.floor(m / 60);
+    if (h < 24) return h + ' 小时前';
+    const d = Math.floor(h / 24);
+    if (d < 30) return d + ' 天前';
+    try { return new Date(ts).toLocaleDateString(); } catch (e) { return ''; }
+  }
+
+  /* 精确钟点（只用于 title 提示，不直接显示） */
+  function exactTime(ts) {
+    if (!ts || !isFinite(ts)) return '';
+    try { return new Date(ts).toLocaleString(); } catch (e) { return ''; }
+  }
+
+  /* 时长是否落在合理区间。清单里的 duration 经常是站点写死的假值
+     （实测过 9 小时这种），超过 6 小时或不足 1 秒一律视为不可信。 */
+  function saneDuration(sec) {
+    return typeof sec === 'number' && isFinite(sec) && sec >= 1 && sec <= 6 * 3600;
   }
 
   function hostOf(url) {
@@ -548,6 +571,68 @@
     setTimeout(() => t.remove(), ms || 2600);
   }
 
+  /* ---------------- 诊断信息导出 ----------------
+   * 把「这个页面到底嗅探到了什么」整理成一段纯文本，一键复制。
+   * 遇到"扫不到 / 只有声音 / 时长不对"这类问题时，把它贴回来就能直接定位，
+   * 不必再来回猜。 */
+  function buildDiagnostics() {
+    const lines = [];
+    lines.push('视频嗅探下载器 · 诊断信息');
+    lines.push('扩展版本: ' + (HAS_CHROME && chrome.runtime && chrome.runtime.getManifest
+      ? (chrome.runtime.getManifest().version || '?') : '演示模式'));
+    lines.push('页面: ' + (pageUrl || '(未知)'));
+    lines.push('时间: ' + new Date().toLocaleString());
+    lines.push('条目 ' + items.length + ' 个（当前筛选: ' + filter + '）');
+    items.forEach((it, i) => {
+      const info = roleInfoOf(it);
+      lines.push((i + 1) + '. [' + it.kind + ']' + (it.ext ? '.' + it.ext : '') +
+        ' source=' + (it.source || '?') +
+        (it.size ? ' size=' + it.size : '') +
+        (it.role ? ' role=' + it.role : '') +
+        (it.slice ? ' slice=1' : '') +
+        (it.derived ? ' derived=1' : ''));
+      lines.push('    ' + it.url);
+      if (info) {
+        lines.push('    识别: ' + (info.ok
+          ? ((info.role || '?') + ' / ' + (info.codec || '?') + ' / ' + (info.detail || ''))
+          : ('失败 ' + (info.error || ''))));
+      }
+    });
+    dashReps.forEach((v, k) => {
+      lines.push('DASH 清单 ' + k + ' → 画面 ' + v.video.length + ' 轨 / 音频 ' + v.audio.length +
+        ' 轨 / 声明时长 ' + v.duration + ' 秒 / live=' + (v.isLive ? 1 : 0));
+      v.video.slice(0, 3).forEach((r) => lines.push('    画面轨 ' + (r.id || '') + ' ' + (r.bandwidth || 0) +
+        'bps ' + (r.width || 0) + 'x' + (r.height || 0) + ' 分片 ' + (r.segmentUrls || []).length));
+      v.audio.slice(0, 3).forEach((r) => lines.push('    音频轨 ' + (r.id || '') + ' ' + (r.bandwidth || 0) +
+        'bps ' + (r.sampleRate || 0) + 'Hz ' + (r.channels || 0) + 'ch 分片 ' + (r.segmentUrls || []).length));
+    });
+    hlsAudioGroups.forEach((v, k) => {
+      lines.push('HLS 音频组 ' + k + ' → ' + v.map((x) => x.url).join(' , '));
+    });
+    lines.push('候选（尚未定性）' + candUrls.length + ' 个:');
+    candUrls.forEach((u) => lines.push('    ' + u));
+    return lines.join('\n');
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).then(() => true, () => false);
+    }
+    return new Promise((resolve) => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand('copy');
+        ta.remove();
+        resolve(!!ok);
+      } catch (e) { resolve(false); }
+    });
+  }
+
   /* ---------------- 数据加载 ---------------- */
 
   async function loadSettings() {
@@ -641,6 +726,7 @@
       const r = await bg({ type: 'GET_TASKS' });
       tasks = (r && r.tasks) || [];
     } catch (e) { tasks = []; }
+    announceFinished(tasks);
   }
 
   /* ---------------- 渲染 ---------------- */
@@ -691,6 +777,7 @@
       subs.push(fmtTime(it.time));
       if (it.source === 'dom') subs.push('页面元素');
       else subs.push('网络请求');
+      const subTitle = it.time ? ('嗅探于 ' + exactTime(it.time)) : '';
 
       const isHlsGroup = !!(it.derived && it.role === 'audio' && it.source === 'hlsgroup'); // 主清单 #EXT-X-MEDIA 推导出的独立音频轨
       const isDashGroup = !!(it.derived && it.source === 'dashgroup');   // .mpd 里推导出的独立音频轨
@@ -792,7 +879,7 @@
         '<span class="badge ' + cls + '">' + label + '</span>' +
         '<div class="item-main">' +
           '<div class="item-name" title="' + esc(it.url) + '">' + esc(name) + '</div>' +
-          '<div class="item-sub">' + subs.map((s, i) => i === 0 ? s : '<span class="dot"></span>' + s).join('') + '</div>' +
+          '<div class="item-sub"' + (subTitle ? ' title="' + esc(subTitle) + '"' : '') + '>' + subs.map((s, i) => i === 0 ? s : '<span class="dot"></span>' + s).join('') + '</div>' +
           noteHtml +
         '</div>' +
         '<div class="item-acts">' + acts + '</div>' +
@@ -805,10 +892,29 @@
       '<div class="variant-loading">正在获取清晰度列表…</div></div>';
   }
 
+  /* 任务完成提示：只弹一次 toast，不进列表。
+     下载记录本身仍写在 chrome.storage.session 里（测试与调试要读），
+     但界面不再堆积历史条目 —— 用户明确不需要。 */
+  const toastedTasks = new Set();
+  function announceFinished(list) {
+    if (IS_DEMO) return;
+    for (const t of list || []) {
+      if (!t || t.status === 'running' || toastedTasks.has(t.id)) continue;
+      toastedTasks.add(t.id);
+      if (t.status === 'done') {
+        toast('下载完成：' + (t.name || 'video') + (t.sizeStr ? '（' + t.sizeStr + '）' : ''), 4000);
+      } else if (t.status === 'error') {
+        toast('下载失败：' + (t.name || 'video') + (t.error ? '（' + t.error + '）' : ''), 6000);
+      }
+    }
+  }
+
   function renderTasks() {
     const sec = $('#tasksSection');
+    /* 正常模式只显示「正在进行」的任务：做完的就从界面上消失，避免越积越多。
+       演示模式保留完成态，商店截图要展示完整界面。 */
     const running = tasks.filter((t) => t.status === 'running');
-    const recent = tasks.filter((t) => t.status !== 'running').slice(0, 3);
+    const recent = IS_DEMO ? tasks.filter((t) => t.status !== 'running').slice(0, 3) : [];
     const show = running.concat(recent);
     if (!show.length) { sec.hidden = true; return; }
     sec.hidden = false;
@@ -911,13 +1017,19 @@
       } else {
         const len = parsed.segments.length;
         const liveWarn = parsed.isLive ? '<div class="variant-hint">⚠ 检测到直播流，只能下载当前已缓存的片段</div>' : '';
+        /* 清单声明的时长未必可信（站点写死值、单位搞错都会发生）。只展示落在合理区间内的值，
+           离谱的直接不显示，而不是摆一个 9 小时的假数字让人以为视频真有那么长。 */
+        const durTxt = saneDuration(parsed.totalDuration)
+          ? ' · 约 ' + Math.round(parsed.totalDuration / 60) + ' 分钟'
+          : '';
         panel.innerHTML = liveWarn +
           '<div class="variant-row" data-direct="1">' +
           '<span class="v-res">直接下载' + (parsed.isLive ? '（直播快照）' : '') + '</span>' +
-          '<span class="v-meta">共 ' + len + ' 个分片' + (parsed.totalDuration ? ' · 约 ' + Math.round(parsed.totalDuration / 60) + ' 分钟' : '') + '</span>' +
+          '<span class="v-meta">共 ' + len + ' 个分片' + durTxt + '</span>' +
         '</div>';
         panel.querySelector('[data-direct]').addEventListener('click', () => {
-          if (parsed.isLive && !confirm('这是直播流，只能下载当前时刻已缓存的片段（约 ' + Math.round(parsed.totalDuration / 60) + ' 分钟）。继续下载？')) return;
+          if (parsed.isLive && saneDuration(parsed.totalDuration) &&
+              !confirm('这是直播流，只能下载当前时刻已缓存的片段（约 ' + Math.round(parsed.totalDuration / 60) + ' 分钟）。继续下载？')) return;
           startHls(item, item.url, '');
         });
       }
@@ -1212,6 +1324,18 @@
       });
     }
 
+    /* 复制诊断信息：把当前页面嗅探到的全部条目与识别结果导出成文本 */
+    const diag = $('#diagLink');
+    if (diag) {
+      diag.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const text = buildDiagnostics();
+        const ok = await copyText(text);
+        toast(ok ? '诊断信息已复制，直接粘贴给我即可' : '复制失败，请手动查看控制台', 3600);
+        if (!ok) console.log(text);
+      });
+    }
+
     /* 演示模式下阻止 iframe/预览中的真实跳转 */
     if (IS_DEMO) {
       document.addEventListener('click', (e) => {
@@ -1269,22 +1393,25 @@
         const mpd = items.find((it) => it.kind === 'dash');
         if (mpd) await onDashClick(mpd);
       }
-      document.body.dataset.ready = '1';
-      window.__POP_READY = true;
-      return;
-    }
-
-    /* 打开 popup 时顺带触发一次页面 DOM 扫描 */
-    if (currentTab && currentTab.id >= 0) {
+    } else if (currentTab && currentTab.id >= 0) {
+      /* 打开 popup 时顺带触发一次页面 DOM 扫描 */
       try { await chrome.tabs.sendMessage(currentTab.id, { type: 'DOM_SCAN' }); } catch (e) { /* ignore */ }
     }
+
+    /* 供自动化测试判断页面就绪：演示模式与真实模式都要置位 */
+    document.body.dataset.ready = '1';
+    window.__POP_READY = true;
   }
 
   /* 供自动化测试读取内部纯逻辑（只读，不影响运行时行为） */
   window.__POP_TEST__ = {
     groupKeyOf, qualityTagOf, splitExt, scoreOfTrack, buildGroups, isSeg,
     roleInfoOf, roleOf, isTrackLike, identityOf, repSpec,
+    fmtTime, exactTime, saneDuration, buildDiagnostics,
+    /* 测试缝：直接灌一批任务并重渲染，用来验证"界面只显示进行中的任务" */
+    setTasks: (list) => { tasks = list || []; renderTasks(); return tasks.length; },
     getItems: () => items,
+    getTasks: () => tasks,
     getProbeMap: () => probeMap,
     getMediaRole: () => (typeof MediaRole !== 'undefined' ? MediaRole : null),
     getMpdKit: () => (typeof MpdKit !== 'undefined' ? MpdKit : null),

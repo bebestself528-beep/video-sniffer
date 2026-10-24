@@ -36,7 +36,7 @@
     if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout && AbortSignal.any) {
       sig = AbortSignal.any([signal, AbortSignal.timeout(30000)]);
     }
-    const res = await fetch(url, { credentials: 'include', cache: 'no-store', signal: sig });
+    const res = await HLSKit.fetchSmart(url, { cache: 'no-store', signal: sig });
     if (!res.ok) throw new Error('获取播放列表失败：HTTP ' + res.status);
     const text = (await res.text()).replace(/^\uFEFF/, '');
     if (!/^#EXTM3U/.test(text.trim().slice(0, 200))) throw new Error('返回内容不是有效的 m3u8 播放列表');
@@ -174,7 +174,7 @@
       if (typeof AbortSignal !== 'undefined' && AbortSignal.timeout && AbortSignal.any) {
         sig = AbortSignal.any([abort.signal, AbortSignal.timeout(30 * 60 * 1000)]);
       }
-      const res = await fetch(msg.url, { credentials: 'include', cache: 'no-store', signal: sig });
+      const res = await HLSKit.fetchSmart(msg.url, { cache: 'no-store', signal: sig });
       if (!res.ok) throw new Error('HTTP ' + res.status);
 
       const total = parseInt(res.headers.get('content-length') || '0', 10) || 0;
@@ -196,7 +196,9 @@
       }
 
       const mime = res.headers.get('content-type') || 'application/octet-stream';
-      const blob = new Blob(chunks, { type: mime.split(';')[0].trim() });
+      /* 直链回退保存下来的往往就是站点原样的 fMP4，顺手补上索引 */
+      const idx = seekableMp4(chunks);
+      const blob = new Blob(idx.parts, { type: mime.split(';')[0].trim() });
       report({ phase: '保存文件', bytes, total }, true);
 
       const finalName = sanitizePath(msg.filename || msg.name || 'file');
@@ -206,6 +208,7 @@
         status: 'done',
         phase: '已完成（自动重试成功）',
         sizeStr: fmtBytes(blob.size),
+        note: withIndexNote('', idx),
         downloadId: saved.downloadId,
         saveVia: saved.saveVia,
         bytes,
@@ -239,7 +242,7 @@
 
   /* 流式下载为 Uint8Array，边读边回调进度 */
   async function fetchToBuffer(url, signal, onProgress) {
-    const res = await fetch(url, { credentials: 'include', cache: 'no-store', signal });
+    const res = await HLSKit.fetchSmart(url, { cache: 'no-store', signal });
     if (!res.ok) throw new Error('HTTP ' + res.status + '（' + url.slice(0, 80) + '）');
     const total = parseInt(res.headers.get('content-length') || '0', 10) || 0;
     const chunks = [];
@@ -301,6 +304,41 @@
     return 'mp4';
   }
 
+  /* 从一串分片里攒出开头若干字节，用来给容器判定当样本。
+     moov 一般在 init 段里，前 256 KB 足够覆盖；攒不到就返回 null。 */
+  function headBytesOf(parts, limit) {
+    let total = 0;
+    for (const p of parts || []) total += p.length;
+    if (!total) return null;
+    const n = Math.min(total, limit || 262144);
+    const out = new Uint8Array(n);
+    let off = 0;
+    for (const p of parts || []) {
+      if (off >= n) break;
+      const take = Math.min(p.length, n - off);
+      out.set(p.subarray(0, take), off);
+      off += take;
+    }
+    return out;
+  }
+
+  /* 这串分片拼出来的 MP4 里有没有视频轨。
+     只在「源确定含视频」的场景用（TS 的 PMT 必然列了视频流）——
+     用于把"只剩声音"这种静默失真变成一句明确的说明。 */
+  function hasVideoTrack(parts) {
+    try {
+      if (typeof Fmp4Merge === 'undefined' || !Fmp4Merge || !Fmp4Merge.classifyHead) return true;
+      const head = headBytesOf(parts, 262144);
+      if (!head) return true;
+      const info = Fmp4Merge.classifyHead(head);
+      /* 判不出来时按"有"处理：宁可漏报也不要冤枉一份正常文件 */
+      if (!info || !info.ok) return true;
+      return info.role !== 'audio';
+    } catch (e) {
+      return true;
+    }
+  }
+
   /* 把一份 HLS 清单展开成「一条完整轨道」的字节流。
      合并的两侧都可能是清单而不是文件 —— 主流 HLS 用
        #EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aac",URI="audio/index.m3u8"
@@ -330,7 +368,7 @@
   /* 统一入口：一条轨可能是单个文件，也可能是一份 HLS 清单。
      不能只看 URL 后缀 —— HLS 音频组地址常常没有后缀，只能看内容。 */
   async function fetchTrack(url, signal, onProgress) {
-    const res = await fetch(url, { credentials: 'include', cache: 'no-store', signal });
+    const res = await HLSKit.fetchSmart(url, { cache: 'no-store', signal });
     if (!res.ok) throw new Error('HTTP ' + res.status + '（' + url.slice(0, 80) + '）');
 
     const ct = (res.headers.get('content-type') || '').toLowerCase();
@@ -360,7 +398,7 @@
         /* 服务器把清单标成 text/plain 或 octet-stream 时，只能靠内容认出来 */
         if (looksLikeM3u8(value)) {
           try { reader.cancel(); } catch (e) { /* ignore */ }
-          const again = await fetch(url, { credentials: 'include', cache: 'no-store', signal });
+          const again = await HLSKit.fetchSmart(url, { cache: 'no-store', signal });
           return { data: await expandHls(await again.text(), url, signal, onProgress), total: 0 };
         }
       }
@@ -514,7 +552,10 @@
 
       const outExt = containerExtOf(out);
       const outMime = outExt === 'webm' ? 'video/webm' : (outExt === 'ts' ? 'video/mp2t' : 'video/mp4');
-      const blob = new Blob([out], { type: outMime });
+      /* 合并出来的是碎片化 MP4（moof 一堆、没有 stbl 索引），这里补成标准 MP4 */
+      const outIdx = seekableMp4([out], outExt);
+      note = withIndexNote(note, outIdx);
+      const blob = new Blob(outIdx.parts, { type: outMime });
 
       report({ phase: '保存文件', bytes: v.data.length + a.data.length }, true);
       const finalName = sanitizePath(msg.name || 'video') + '.' + outExt;
@@ -542,7 +583,7 @@
       report({
         status: 'done',
         phase: fallback ? (audioSavedName ? '已完成（视频轨 + 音频轨分别保存）' : '已完成（仅视频轨）') : '已完成（音视频已合并）',
-        sizeStr: fmtBytes(out.length),
+        sizeStr: fmtBytes(blob.size),
         note,
         bytes: v.data.length + a.data.length,
         total: v.data.length + a.data.length,
@@ -619,7 +660,9 @@
           : ext === 'ts' ? 'video/mp2t'
             : ext === 'm4a' ? 'audio/mp4'
               : (msg.kind === 'audio' ? 'audio/mp4' : 'video/mp4');
-      const blob = new Blob([got.data], { type: mime });
+      /* init + 一串分片拼出来的必然是碎片化 MP4 —— 正是拖不动进度条的形态 */
+      const partsIdx = seekableMp4([got.data], ext);
+      const blob = new Blob(partsIdx.parts, { type: mime });
       report({ phase: '保存文件', bytes: got.data.length }, true);
 
       const finalName = sanitizePath(msg.name || 'audio') + '.' + ext;
@@ -630,8 +673,8 @@
       report({
         status: 'done',
         phase: '已完成',
-        sizeStr: fmtBytes(got.data.length),
-        note: '已下载 ' + totalParts + ' 个分片并拼接为一条完整轨道',
+        sizeStr: fmtBytes(blob.size),
+        note: withIndexNote('已下载 ' + totalParts + ' 个分片并拼接为一条完整轨道', partsIdx),
         bytes: got.data.length,
         total: got.data.length,
         downloadId: saved.downloadId,
@@ -648,6 +691,144 @@
       tasks.delete(taskId);
       scheduleClose();
     }
+  }
+
+  /* ---------------- 落盘前的最后一道加工：让 MP4 能拖进度条 ----------------
+   * 站点分发的 MP4 大多是「碎片化 MP4（fMP4）」：moov 里只有轨道描述，逐帧
+   * 索引散在成百上千个 moof 里，很多源的 mvhd.duration 还写成 0xFFFFFFFF。
+   * 这样的文件能播放，但进度条拖不动——Chrome 靠 sidx/扫描勉强能跳（大文件
+   * 会卡很久），系统播放器、剪映、PotPlayer 之类直接不给拖。
+   *
+   * 这里把 fMP4 重建为标准 MP4（ftyp + moov(完整 stbl) + mdat），任何播放器
+   * 都能精确定位任意时间点。
+   *
+   * 三条保命规则：
+   *   1. 只处理内容像 MP4 的（看首盒类型），WebM/TS 一律不碰；
+   *   2. 先看开头一小段判断要不要重建，避免为「判断」把几百 MB 先拼一遍；
+   *   3. 任何异常都原样落盘——宁可拖不动，也绝不丢文件、绝不产出坏文件。
+   */
+  const MP4_TOP_BOX = {
+    ftyp: 1, styp: 1, moov: 1, mdat: 1, moof: 1,
+    free: 1, skip: 1, wide: 1, sidx: 1, pdin: 1
+  };
+  const MAX_INDEX_BYTES = 2 * 1024 * 1024 * 1024;   /* 超过 2 GB 不再重建，避免爆内存 */
+  const HEAD_LIMIT = 256 * 1024;                    /* 预判只看开头 256 KB */
+
+  /**
+   * @param {Uint8Array[]} parts 待落盘的分片（Blob 的构成元素）
+   * @param {string} [ext] 目标扩展名；给了就只在 mp4/m4a/m4v 上动手
+   * @returns {{parts: Uint8Array[], note: string, changed: boolean, durationSec: number}}
+   */
+  function seekableMp4(parts, ext) {
+    const keep = { parts: parts, note: '', changed: false, durationSec: 0 };
+    try {
+      if (typeof Mp4Index === 'undefined' || !Mp4Index) return keep;
+      if (ext && ext !== 'mp4' && ext !== 'm4a' && ext !== 'm4v') return keep;
+      if (!parts || !parts.length) return keep;
+
+      const first = parts[0];
+      if (!first || first.length < 16) return keep;
+      if (!MP4_TOP_BOX[String.fromCharCode(first[4], first[5], first[6], first[7])]) return keep;
+
+      /* 开头一段做预判：已经是标准 MP4 就完全不用拼整个文件。
+         注意不能只看 parts[0]——HLS 的 init 段只有 32 字节的 ftyp，
+         单看它什么也判断不出来，必须按分片边界累积到 256 KB。 */
+      let head = first;
+      if (parts.length > 1) {
+        const picked = [];
+        let hn = 0;
+        for (let i = 0; i < parts.length && (i === 0 || hn < HEAD_LIMIT); i++) {
+          picked.push(parts[i]);
+          hn += parts[i].length;
+        }
+        if (picked.length > 1) {
+          head = new Uint8Array(hn);
+          let hp = 0;
+          for (let i = 0; i < picked.length; i++) { head.set(picked[i], hp); hp += picked[i].length; }
+        }
+      }
+      if (Mp4Index.sniffHead(head.subarray(0, Math.min(head.length, HEAD_LIMIT))) !== 'rebuild') return keep;
+
+      let total = 0;
+      for (let i = 0; i < parts.length; i++) total += parts[i].length;
+      if (total > MAX_INDEX_BYTES) {
+        return { parts: parts, note: '（文件超过 2 GB，未重建索引）', changed: false, durationSec: 0 };
+      }
+
+      let data = first;
+      if (parts.length > 1) {
+        data = new Uint8Array(total);
+        let dp = 0;
+        for (let i = 0; i < parts.length; i++) { data.set(parts[i], dp); dp += parts[i].length; }
+      }
+
+      const info = Mp4Index.inspect(data);
+      if (!info.ok || !info.needsRebuild) return keep;
+
+      /* asParts 模式：直接把新分片交给 Blob，省掉一次整文件拷贝 */
+      const r = Mp4Index.toIndexedMp4(data, { asParts: true });
+      if (!r || !r.changed || !r.parts || !r.parts.length) return keep;
+
+      return { parts: r.parts, note: r.note, changed: true, durationSec: r.durationSec };
+    } catch (e) {
+      return {
+        parts: parts,
+        note: '（索引重建跳过：' + String((e && e.message) || e) + '）',
+        changed: false,
+        durationSec: 0
+      };
+    }
+  }
+
+  /* 把加工结果拼进已有的说明文字 */
+  function withIndexNote(note, r) {
+    if (!r || !r.note) return note;
+    return note ? note + '；' + r.note : r.note;
+  }
+
+  /* ---------------- 实测时长 ----------------
+   * 清单里声明的时长经常是假的：站点写死值、单位搞错、直播流当成点播，
+   * 都会让"约 N 分钟"变成一个离谱的数字。这里从**已经下载到手的分片**里
+   * 逐块解析盒头量出真实时长（不整份拼接，代价只是扫一遍 box 头），
+   * 写进任务说明。两者差得远时一并提示，用户就不会对着一串假数字发呆。 */
+  function fmtDur(sec) {
+    if (!isFinite(sec) || sec <= 0) return '';
+    const s = Math.round(sec);
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const r = s % 60;
+    const p = (x) => String(x).padStart(2, '0');
+    return h ? (h + ':' + p(m) + ':' + p(r)) : (m + ':' + p(r));
+  }
+
+  function measuredDurationFromSegments(initParts, segBufs) {
+    try {
+      if (typeof Fmp4Merge === 'undefined' || !Fmp4Merge) return 0;
+      const internal = Fmp4Merge._internal;
+      if (!internal || !internal.collectFragments) return 0;
+      const init = (initParts || [])[0];
+      if (!init || !init.byteLength) return 0;
+      const info = Fmp4Merge.inspect(init);
+      if (!info || !info.ok) return 0;
+      let end = 0;
+      for (const s of (segBufs || [])) {
+        if (!s || !s.byteLength) continue;
+        for (const f of internal.collectFragments(s, info)) {
+          end = Math.max(end, f.seconds + f.durationSec);
+        }
+      }
+      return end > 0.5 ? end : 0;
+    } catch (e) { return 0; }
+  }
+
+  /* 实测时长 + 与声明时长的比对，拼成一句人话 */
+  function durationNote(measured, declared, isLive) {
+    if (isLive || !(measured > 0)) return '';
+    const mine = '实测时长 ' + fmtDur(measured);
+    if (declared > 0 && Math.abs(declared - measured) > Math.max(2, declared * 0.05)) {
+      return mine + '（清单声明 ' + fmtDur(declared) + '，与实际不符）';
+    }
+    return mine;
   }
 
   /* ---------------- 任务执行 ---------------- */
@@ -740,16 +921,33 @@
 
       const firstExt = HLSKit.sniffExt(segBufs[0]);
       const tsInput = HLSKit.isTsData(segBufs[0]);
+      /* TS 里的视频编码：mux.js 只认 H.264。是 HEVC 等其他编码时硬转，
+         视频轨会悄悄消失、只剩声音 —— 那就得原样输出 TS 并说明白。 */
+      const tsVid = tsInput ? HLSKit.tsVideoStreamType(segBufs[0]) : 0;
+      const tsTransmuxable = !tsInput || !tsVid || HLSKit.TS_TRANSMUXABLE[tsVid];
+      const tsCodecNote = tsInput && tsVid && !HLSKit.TS_TRANSMUXABLE[tsVid]
+        ? '检测到 ' + (tsVid === 0x24 ? 'HEVC(H.265)' : '流类型 0x' + tsVid.toString(16)) +
+          ' 视频，自动转 MP4 只支持 H.264，已输出 TS 文件（用支持该编码的播放器可直接播放）'
+        : '';
 
       if (parsed.initSegment) {
         /* fMP4（EXT-X-MAP）：init + 分片直接拼接即有效 MP4 */
         finalParts = result.initParts.concat(segBufs);
         ext = 'mp4';
-      } else if (tsInput && wantMp4 && typeof muxjs !== 'undefined' && muxjs && muxjs.mp4) {
+      } else if (tsInput && wantMp4 && tsTransmuxable && typeof muxjs !== 'undefined' && muxjs && muxjs.mp4) {
         report({ phase: '转封装为 MP4' }, true);
         try {
-          finalParts = HLSKit.transmuxTsToMp4(muxjs, segBufs);
-          ext = 'mp4';
+          const mp4Parts = HLSKit.transmuxTsToMp4(muxjs, segBufs);
+          /* 产物自检：源是 TS（PMT 里必然有视频流），转出来的 MP4 里就必须
+             真的有视频轨。只剩声音时保留原始 TS —— 一个"只有声音的 MP4"比
+             一个打不开的 TS 更糟：用户既看不了也听不出发生了什么，只会得到
+             "下载下来只有音频"这种毫无线索的结论。 */
+          if (hasVideoTrack(mp4Parts)) {
+            finalParts = mp4Parts;
+            ext = 'mp4';
+          } else {
+            note = '转封装结果里没有视频轨（只剩声音），已保留原始 TS 文件';
+          }
         } catch (e) {
           finalParts = null;
         }
@@ -762,14 +960,23 @@
         } else {
           finalParts = result.initParts.concat(segBufs);
           ext = tsInput ? 'ts' : (firstExt || 'ts');
-          if (tsInput && wantMp4) note = '自动转 MP4 未成功，已输出 TS 文件（可用播放器直接播放）';
+          /* 编码不支持优先说编码，其次才说"转换没成功" */
+          if (tsCodecNote) note = tsCodecNote;
+          else if (tsInput && wantMp4) note = '自动转 MP4 未成功，已输出 TS 文件（可用播放器直接播放）';
         }
       }
       if (ext === 'ts') mime = 'video/mp2t';
       else if (ext === 'webm') mime = 'video/webm';
       else if (parsed.initSegment || ext === 'mp4') mime = 'video/mp4';
 
-      const blob = new Blob(finalParts, { type: mime });
+      /* HLS 走 EXT-X-MAP（fMP4）时，init + 分片直接拼接同样没有索引 */
+      const hlsIdx = seekableMp4(finalParts, ext);
+      note = withIndexNote(note, hlsIdx);
+      /* 清单声明的时长不一定对，补一条从分片里实测出来的真实时长。
+         fMP4（EXT-X-MAP）逐块量；TS 转封装出来的没有 init 段可用，用索引重建得到的时长兜底。 */
+      const measured = measuredDurationFromSegments(result.initParts, segBufs) || hlsIdx.durationSec || 0;
+      note = withIndexNote(note, { note: durationNote(measured, parsed.totalDuration, parsed.isLive) });
+      const blob = new Blob(hlsIdx.parts, { type: mime });
 
       /* 4. 保存 */
       report({ phase: '保存文件' }, true);

@@ -19,9 +19,22 @@ try {
     if (typeof SniffSig === 'undefined') importScripts('lib/sniffsig.js');
     if (typeof MediaRole === 'undefined') importScripts('lib/mediarole.js');
     if (typeof WebmMerge === 'undefined') importScripts('lib/webmmerge.js');
+    /* hls.js 只为带凭证降级的 fetchSmart：部分 CDN 不回
+       Access-Control-Allow-Credentials，带凭证的跨域请求会被 CORS 直接掐断，
+      这里统一走「失败就换不带凭证重试」的那条路。 */
+    if (typeof HLSKit === 'undefined') importScripts('lib/hls.js');
   }
 } catch (e) {
   /* 载入失败时相关功能降级为不可用，不影响其他功能 */
+}
+
+/* 统一的取数入口：优先用 hls.js 的 fetchSmart（带凭证降级），
+   库没载进来时退化成普通 fetch。 */
+async function smartFetch(url, init) {
+  init = init || {};
+  if (typeof HLSKit !== 'undefined' && HLSKit && HLSKit.fetchSmart) return HLSKit.fetchSmart(url, init);
+  const res = await fetch(url, init);
+  return res;
 }
 
 /* 文件头探测结果缓存（同一会话内避免重复请求；URL 含时效签名，故不做持久化） */
@@ -196,7 +209,13 @@ const UNRELIABLE_CT_RE = /^(text\/plain|text\/html|application\/octet-stream|bin
 /* URL 里出现这些词，说明它很可能是一份流地址（清单或分片） */
 const SUSPECT_URL_RE = /(m3u8|m3u(?![\da-z])|\bmpd\b|manifest|playlist|playurl|videoplayback|hls|dash|\/stream|\/vod\/|live\/|master\.)/i;
 
-function isSuspectStream(url, ct, type) {
+/* 体积达到这个数的"类型不明"响应也值得当候选看一眼。
+   不少站点把视频/分片塞进 application/octet-stream，URL 又是一串防盗链签名、
+   没有任何关键词，只能靠"够大"把它捞回来，再由内容签名定性。
+   阈值取 256 KB：正常脚本 / JSON / 字体都远小于它，而 240p 的 6 秒分片也有 ~375 KB。 */
+const LARGE_BINARY_BYTES = 256 * 1024;
+
+function isSuspectStream(url, ct, type, len) {
   if (typeof url !== 'string' || !/^https?:/i.test(url) || url.length > 2048) return false;
   if (dropCache.has(url)) return false;
   if (MEDIA_EXT_RE.test(url)) return false;                                   // 后缀已足够判定
@@ -205,7 +224,9 @@ function isSuspectStream(url, ct, type) {
   /* type=media 是浏览器明确认定「这是媒体资源」的强信号（<video>/<audio>/MSE 发起的请求），
      此时即使 URL 完全不含流特征词（抖音分离轨就是这样：一串签名参数、无后缀），也值得记为候选 */
   if (type === 'media') return true;
-  return SUSPECT_URL_RE.test(url);
+  if (SUSPECT_URL_RE.test(url)) return true;
+  /* 大块二进制：兜住"URL 无特征 + Content-Type 不明 + 非 media 类型"的漏网之鱼 */
+  return (len || 0) >= LARGE_BINARY_BYTES;
 }
 
 /* 记为候选（优先级最低，一旦有真类型会立刻被覆盖） */
@@ -323,7 +344,7 @@ chrome.webRequest.onHeadersReceived.addListener(
 
     /* 响应头判不出类型（如 m3u8 被以 text/plain 返回），但 URL 像流地址
        → 记为候选，稍后由 popup 触发按内容签名定性（见 PROBE_KIND） */
-    if (isSuspectStream(d.url, ct, d.type)) {
+    if (isSuspectStream(d.url, ct, d.type, len)) {
       recordCandidate(d.tabId, d.url, len, d.initiator || '');
     }
   },
@@ -699,8 +720,7 @@ async function handleMessage(msg, sender) {
     /* ---- popup：抓取播放列表文本（走后台以便附带 Referer 规则） ---- */
     case 'FETCH_TEXT': {
       await ensureHostRule(msg.url, msg.pageUrl);
-      const res = await fetch(msg.url, {
-        credentials: 'include',
+      const res = await smartFetch(msg.url, {
         cache: 'no-store',
         signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(20000) : undefined
       });
@@ -778,9 +798,8 @@ async function handleMessage(msg, sender) {
         if (headCache.has(url)) { out[url] = headCache.get(url); return; }
         try {
           await ensureHostRule(url, it.pageUrl || msg.pageUrl || '');
-          const res = await fetch(url, {
+          const res = await smartFetch(url, {
             headers: { Range: 'bytes=0-65535' },
-            credentials: 'include',
             cache: 'no-store',
             signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
           });
@@ -836,9 +855,8 @@ async function handleMessage(msg, sender) {
         if (sigCache.has(url)) { finish(sigCache.get(url)); return; }
         try {
           await ensureHostRule(url, it.pageUrl || msg.pageUrl || '');
-          const res = await fetch(url, {
+          const res = await smartFetch(url, {
             headers: { Range: 'bytes=0-4095' },
-            credentials: 'include',
             cache: 'no-store',
             signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(12000) : undefined
           });

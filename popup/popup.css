@@ -164,6 +164,10 @@ body {
   border-top: 1px solid var(--border); padding: 7px 12px; font-size: 11px; color: var(--text-dim);
   display: flex; justify-content: space-between; gap: 8px; align-items: center;
 }
+.foot-left { display: flex; align-items: center; gap: 6px; min-width: 0; flex: 1 1 auto; }
+.foot-sep { opacity: .5; }
+.foot-left a { color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; white-space: nowrap; }
+.foot-left a:hover { color: var(--primary); }
 .foot-warn { text-align: right; opacity: .85; flex: none; max-width: 200px; }
 .foot-warn a { color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .foot-warn a:hover { color: var(--primary); }
