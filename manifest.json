@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "视频嗅探下载器",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "嗅探网页中的视频资源并下载到本地。支持 HLS(m3u8)、MP4、WebM、FLV、TS 等格式，支持 AES-128 加密流、自动合并分片并转封装为 MP4。",
   "minimum_chrome_version": "116",
   "permissions": [

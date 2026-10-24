@@ -726,7 +726,6 @@
       const r = await bg({ type: 'GET_TASKS' });
       tasks = (r && r.tasks) || [];
     } catch (e) { tasks = []; }
-    announceFinished(tasks);
   }
 
   /* ---------------- 渲染 ---------------- */
@@ -892,22 +891,8 @@
       '<div class="variant-loading">正在获取清晰度列表…</div></div>';
   }
 
-  /* 任务完成提示：只弹一次 toast，不进列表。
-     下载记录本身仍写在 chrome.storage.session 里（测试与调试要读），
-     但界面不再堆积历史条目 —— 用户明确不需要。 */
-  const toastedTasks = new Set();
-  function announceFinished(list) {
-    if (IS_DEMO) return;
-    for (const t of list || []) {
-      if (!t || t.status === 'running' || toastedTasks.has(t.id)) continue;
-      toastedTasks.add(t.id);
-      if (t.status === 'done') {
-        toast('下载完成：' + (t.name || 'video') + (t.sizeStr ? '（' + t.sizeStr + '）' : ''), 4000);
-      } else if (t.status === 'error') {
-        toast('下载失败：' + (t.name || 'video') + (t.error ? '（' + t.error + '）' : ''), 6000);
-      }
-    }
-  }
+  /* 完成/失败不再弹 toast：用户明确不想要"每次点开插件都提示上次下载状态"。
+     任务记录仍保留在 chrome.storage.session（测试与诊断要读取），界面只显示进行中的任务。 */
 
   function renderTasks() {
     const sec = $('#tasksSection');
